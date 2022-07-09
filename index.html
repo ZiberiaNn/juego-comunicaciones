@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cell Battle</title>
+</head>
+
+<body>
+    <h1>Cell Battle</h1>
+    <p id="pGameId"></p>
+    <button id="btnCreate">Crear Juego</button>
+    <button id="btnJoin">Unirse a un juego</button>
+    <input type="text" id="txtGameId" placeholder="ID de la sala." />
+    <h5>Lista de jugadores:</h5>
+    <div id="divPlayers"></div>
+    <div id="divBoard"></div>
+
+    <script>
+        let clientId = null;
+        let gameId = null;
+        let playerColor = null;
+
+        let ws = new WebSocket("ws://localhost:9090");
+
+        const btnCreate = document.getElementById("btnCreate");
+        const btnJoin = document.getElementById("btnJoin");
+        const txtGameId = document.getElementById("txtGameId");
+        const pGameId = document.getElementById("pGameId");
+        const divPlayers = document.getElementById("divPlayers");
+        const divBoard = document.getElementById("divBoard");
+
+
+        btnJoin.addEventListener("click", e => {
+
+            if (gameId === null) {
+                gameId = txtGameId.value;
+            }
+            const payLoad = {
+                "method": "join",
+                "clientId": clientId,
+                "gameId": gameId
+            }
+
+            ws.send(JSON.stringify(payLoad));
+
+        });
+
+        btnCreate.addEventListener("click", e => {
+            const payLoad = {
+                "method": "create",
+                "clientId": clientId
+            }
+
+            ws.send(JSON.stringify(payLoad));
+
+        });
+
+        ws.onmessage = message => {
+            //message.data
+            const response = JSON.parse(message.data);
+            //conectar
+            if (response.method === "connect") {
+                clientId = response.clientId;
+                console.log("ID del cliente establecido exitosamente: " + clientId);
+            }
+
+            //crear juego
+            if (response.method === "create") {
+                gameId = response.game.id;
+                pGameId.innerHTML = "ID de la sala creada: " + gameId;
+            }
+
+            //unirse a juego
+            if (response.method === "join") {
+                const game = response.game;
+                while (divPlayers.firstChild)
+                    divPlayers.removeChild(divPlayers.firstChild)
+                game.clients.forEach(c => {
+                    const d = document.createElement("div");
+                    d.style.width = "200px"
+                    d.style.background = c.color;
+                    d.textContent = c.clientId;
+                    divPlayers.appendChild(d);
+
+                    if (c.clientId === clientId) playerColor = c.color;
+                })
+
+                //construir el tablero
+                while (divBoard.firstChild)
+                    divBoard.removeChild(divPlayers.firstChild)
+
+                for (let i = 0; i < game.balls; i++) {
+                    const b = document.createElement("button");
+                    b.id = "ball" + i;
+                    b.tag = i + 1;
+                    b.textContent=i+1;
+                    b.style.width="150px";
+                    b.style.height="150px";
+                    b.addEventListener("click", e => {
+                        b.style.background = playerColor;
+                    });
+                    divBoard.appendChild(b);
+                }
+            }
+
+            //mensaje de error
+            if (response.method === "error") {
+                pGameId.innerHTML = response.message;
+            }
+        }
+    </script>
+</body>
+
+</html>
