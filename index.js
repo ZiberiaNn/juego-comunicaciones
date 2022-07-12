@@ -11,6 +11,7 @@ httpServer.listen(9090, () => console.log("Server listening on 9090."));
 
 const clients = {};
 const games = {};
+let red =0,green=0,blue=0;
 
 const wsServer = new webSocketServer({
     "httpServer": httpServer
@@ -23,6 +24,33 @@ wsServer.on("request", request => {
     connection.on("message", message => {
         const result = JSON.parse(message.utf8Data);
 
+        //parar juego
+        if (result.method === "stop") {
+            let winner=null;
+            if (red >= green && red >= blue) {
+                winner = "red";
+            }
+            else if (green >= red && green >= blue) {
+                winner = "green";
+            }
+            else {
+                winner = "blue";
+            }
+            
+            const payLoad = {
+                "method": "stop",
+                "winner": winner
+            }
+
+            for (const g of Object.keys(games)) {
+                const game = games[g];
+                game.clients.forEach(c => {
+                    clients[c.clientId].connection.send(JSON.stringify(payLoad));
+                })
+            }
+        }
+
+        
         if (result.method === "create") {
             const clientId = result.clientId;
             const gameId = guid();
@@ -83,7 +111,6 @@ wsServer.on("request", request => {
                 state = {}
             state[ballId] = color;
             games[gameId].state = state;  
-
         }
     });
 
@@ -105,10 +132,20 @@ wsServer.on("request", request => {
 function updateGameState(){
     for(const g of Object.keys(games)){
         const game = games[g];
+        red=0,green=0,blue=0;
+        if(game.state!=null){
+            for (let i = 1; i <= 20; i++){
+                if(game.state[i]==="Red")red++;
+                if(game.state[i]==="Green")green++;
+                if(game.state[i]==="Blue")blue++;
+            }
+        }
+        
         const payLoad ={
             "method":"update",
-            "game":game
+            "game":game,
         }
+
         game.clients.forEach(c=>{
             clients[c.clientId].connection.send(JSON.stringify(payLoad));
         })

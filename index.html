@@ -17,11 +17,15 @@
     <h5>Lista de jugadores:</h5>
     <div id="divPlayers"></div>
     <div id="divBoard"></div>
+    <button id="btnStop" hidden>STOP</button>
+    <h1 id="winner"></h1>
 
     <script>
         let clientId = null;
         let gameId = null;
         let playerColor = null;
+        let game = null;
+        let winner=null;
 
         let ws = new WebSocket("ws://localhost:9090");
 
@@ -31,10 +35,11 @@
         const pGameId = document.getElementById("pGameId");
         const divPlayers = document.getElementById("divPlayers");
         const divBoard = document.getElementById("divBoard");
+        const btnStop = document.getElementById("btnStop");
+        const hWinner = document.getElementById("winner");
 
 
         btnJoin.addEventListener("click", e => {
-
             if (gameId === null) {
                 gameId = txtGameId.value;
             }
@@ -49,6 +54,7 @@
         });
 
         btnCreate.addEventListener("click", e => {
+
             const payLoad = {
                 "method": "create",
                 "clientId": clientId
@@ -58,9 +64,32 @@
 
         });
 
+        btnStop.addEventListener("click", e => {
+
+            const payLoad = {
+                "method": "stop",
+            }
+            ws.send(JSON.stringify(payLoad));
+        });
+
         ws.onmessage = message => {
             //message.data
             const response = JSON.parse(message.data);
+            game = response.game;
+
+            //parar juego
+            if(response.method==="stop"){
+                winner = response.winner;
+                hWinner.innerHTML = "El ganador es: "+ winner; 
+                btnStop.setAttribute("hidden","");
+            }
+
+            //mensaje de error
+            if (response.method === "error") {
+                pGameId.innerHTML = response.message;
+                return;
+            }
+
             //conectar
             if (response.method === "connect") {
                 clientId = response.clientId;
@@ -74,12 +103,12 @@
             }
 
             //actualizar juego
-            if(response.method==="update"){
-                if(!response.game.state)return;
-                for(const b of Object.keys(response.game.state)){
-                    const color=response.game.state[b];
-                    const ballObject = document.getElementById("ball"+b);
-                    ballObject.style.backgroundColor=color;
+            if (response.method === "update") {
+                if (!response.game.state) return;
+                for (const b of Object.keys(response.game.state)) {
+                    const color = response.game.state[b];
+                    const ballObject = document.getElementById("ball" + b);
+                    ballObject.style.backgroundColor = color;
                 }
             }
 
@@ -104,7 +133,7 @@
 
                 for (let i = 0; i < game.balls; i++) {
                     const b = document.createElement("button");
-                    b.id = "ball" + (i+1);
+                    b.id = "ball" + (i + 1);
                     b.tag = i + 1;
                     b.textContent = i + 1;
                     b.style.width = "150px";
@@ -122,11 +151,7 @@
                     });
                     divBoard.appendChild(b);
                 }
-            }
-
-            //mensaje de error
-            if (response.method === "error") {
-                pGameId.innerHTML = response.message;
+                btnStop.removeAttribute("hidden");
             }
         }
     </script>
